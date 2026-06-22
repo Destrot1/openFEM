@@ -1,0 +1,12 @@
+# Build artifacts
+build/
+*.o
+*.so
+
+# Generated at runtime by the CLI/viewer, not source
+web/scene.json
+web/snapshots/
+
+# OS/editor cruft
+.DS_Store
+*.swp
