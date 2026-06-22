@@ -10,3 +10,6 @@ web/snapshots/
 # OS/editor cruft
 .DS_Store
 *.swp
+
+# Internal dev notes, not for the public repo
+PROJECT_OVERVIEW.md
