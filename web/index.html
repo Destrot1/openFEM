@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>openFEM viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    :root {
+      --terminal-height: 280px;
+      --bg: #1c232e;
+      --panel-bg: rgba(40, 48, 61, 0.82);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #eef1f6;
+      --text-dim: #9aa3b5;
+      --accent: #5b8def;
+      --accent-soft: rgba(91, 141, 239, 0.18);
+      --radius: 10px;
+      --font-ui: 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    body {
+      margin: 0; overflow: hidden;
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* Thin, unobtrusive scrollbar matching the dark theme, used by #legend. */
+    * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
+    *::-webkit-scrollbar { width: 8px; }
+    *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 8px; }
+
+    #info {
+      position: absolute; top: 12px; left: 14px;
+    }
+    #logo {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 19px; font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    #logo svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--accent); }
+    #logo .dim { color: var(--text-dim); font-weight: 600; }
+    #logo .accent { color: var(--accent); }
+    #infoHint {
+      margin-top: 2px;
+      color: var(--text-dim); font-size: 11.5px;
+      letter-spacing: 0.01em;
+    }
+    #tooltip {
+      position: absolute;
+      color: var(--text);
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--panel-border);
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      pointer-events: none;
+      white-space: nowrap;
+      transform: translate(-50%, -150%);
+      display: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+    .axis-label {
+      position: absolute;
+      font-weight: 700;
+      font-size: 14px;
+      font-family: var(--font-mono);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      text-shadow: 0 0 4px #000, 0 0 6px #000, 0 0 8px #000;
+    }
+    #legend {
+      position: absolute;
+      top: 56px; right: 12px;
+      color: var(--text);
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-border);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      font-size: 12.5px;
+      max-width: 290px;
+      max-height: 68vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    #legend b {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-dim);
+      margin: 10px 0 6px;
+    }
+    #legend b:first-child { margin-top: 0; }
+    #legend b svg { width: 13px; height: 13px; }
+    #legend .row { display: flex; align-items: center; margin-bottom: 5px; line-height: 1.35; }
+    #legend .swatch {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 3px;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    #modeToggle {
+      position: absolute; top: 12px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex; gap: 4px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      padding: 4px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+    }
+    #modeToggle button {
+      display: flex; align-items: center; gap: 6px;
+      background: transparent; color: var(--text-dim);
+      border: none; border-radius: 999px;
+      padding: 6px 16px; font-size: 12.5px; font-weight: 500;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    #modeToggle button svg { width: 14px; height: 14px; }
+    #modeToggle button:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+    #modeToggle button.active { background: var(--accent); color: #fff; }
+
+    .results-legend {
+      position: absolute;
+      color: var(--text);
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-border);
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      display: none;
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .results-legend b { font-weight: 600; }
+    .results-legend .grad-bar {
+      width: 130px; height: 8px;
+      border-radius: 4px;
+      margin: 6px 0 4px;
+    }
+    .results-legend .minmax {
+      display: flex; justify-content: space-between; width: 130px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+    #quadDividerV, #quadDividerH {
+      position: absolute;
+      background: rgba(255,255,255,0.10);
+      display: none;
+      pointer-events: none;
+    }
+    #quadDividerV { top: 0; bottom: 0; left: 50%; width: 1px; }
+    #quadDividerH { left: 0; right: 0; top: 50%; height: 1px; }
+
+    #resultsMessage {
+      position: absolute; top: 45%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--text-dim); font-size: 15px;
+      display: none;
+    }
+
+    /* The page is split into a 3D viewport on top and a fixed-height
+       terminal panel pinned to the bottom -- both always visible, no
+       toggle, so the terminal behaves like a normal terminal window
+       docked under the viewer instead of a tab you switch to. */
+    #viewportArea {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      bottom: var(--terminal-height);
+      overflow: hidden;
+    }
+
+    #terminalPanel {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      height: var(--terminal-height);
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--panel-border);
+      box-shadow: 0 -8px 24px rgba(0,0,0,0.35);
+      background: #141a22;
+    }
+    #terminalLabel {
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px;
+      color: var(--text-dim);
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--panel-border);
+    }
+    #terminalLabel svg { width: 12px; height: 12px; }
+    #terminalFrame {
+      flex: 1 1 auto;
+      width: 100%;
+      border: none;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="viewportArea">
+    <div id="info">
+      <div id="logo">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 4 L4 20 L20 20 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <circle cx="12" cy="4"  r="2.2" fill="currentColor"/>
+          <circle cx="4"  cy="20" r="2.2" fill="currentColor"/>
+          <circle cx="20" cy="20" r="2.2" fill="currentColor"/>
+        </svg>
+        <span><span class="dim">open</span><span class="accent">FEM</span></span>
+      </div>
+      <div id="infoHint">drag to rotate, scroll to zoom, hover a face/edge to see its name</div>
+    </div>
+    <div id="modeToggle">
+      <button id="btnSetup" class="active"><i data-lucide="box"></i>Setup</button>
+      <button id="btnResults"><i data-lucide="move-3d"></i>Deformation</button>
+      <button id="btnStress"><i data-lucide="gauge"></i>Stress</button>
+    </div>
+    <div id="tooltip"></div>
+    <div id="legend"></div>
+
+    <div id="quadDividerV"></div>
+    <div id="quadDividerH"></div>
+    <div class="results-legend" id="legendUx" style="top:48px; left:8px"></div>
+    <div class="results-legend" id="legendUy" style="top:48px; right:8px"></div>
+    <div class="results-legend" id="legendUz" style="bottom:8px; left:8px"></div>
+    <div class="results-legend" id="legendMag" style="bottom:8px; right:8px"></div>
+    <div class="results-legend" id="legendSx" style="top:48px; left:8px"></div>
+    <div class="results-legend" id="legendSy" style="top:48px; right:8px"></div>
+    <div class="results-legend" id="legendSz" style="bottom:8px; left:8px"></div>
+    <div class="results-legend" id="legendVm" style="bottom:8px; right:8px"></div>
+    <div id="resultsMessage">No results available -- run 'solve' in the CLI, then 'web' again.</div>
+  </div>
+
+  <!-- Fixed panel, always visible -- a real shell (ttyd), auto-running
+       ./openFEM so this looks exactly like launching it from a normal
+       terminal. Quitting it (CLI's 'quit') drops to bash underneath. -->
+  <div id="terminalPanel">
+    <div id="terminalLabel"><i data-lucide="terminal"></i>Terminal</div>
+    <iframe id="terminalFrame" src="http://localhost:7681/"></iframe>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    lucide.createIcons(); // mode-toggle buttons + terminal label icons
+
+    const scene3d = new THREE.Scene();
+    scene3d.background = new THREE.Color(0x1c232e);
+    const resultsScene = new THREE.Scene();
+    resultsScene.background = new THREE.Color(0x1c232e);
+    const stressScene = new THREE.Scene();
+    stressScene.background = new THREE.Color(0x1c232e);
+
+    // The 3D canvas only occupies #viewportArea now (the terminal panel
+    // below it is a fixed-height strip of plain HTML/iframe) -- so its
+    // own size, not the full window's, drives the camera/renderer/
+    // raycasting math everywhere below.
+    const viewportArea = document.getElementById('viewportArea');
+
+    const camera = new THREE.PerspectiveCamera(
+      45, viewportArea.clientWidth / viewportArea.clientHeight, 0.001, 1000
+    );
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(viewportArea.clientWidth, viewportArea.clientHeight);
+    viewportArea.appendChild(renderer.domElement);
+
+    for (const s of [scene3d, resultsScene, stressScene]) {
+      s.add(new THREE.AmbientLight(0xffffff, 0.6));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(1, 2, 3);
+      s.add(dirLight);
+    }
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    // Fit the camera to whatever was just loaded, so the model is
+    // visible and reasonably framed regardless of its real-world size.
+    function frameCamera(object) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3()).length() || 1;
+      const center = box.getCenter(new THREE.Vector3());
+      camera.near = size / 1000;
+      camera.far = size * 100;
+      camera.position.copy(center).add(
+        new THREE.Vector3(1, 1, 1).normalize().multiplyScalar(size)
+      );
+      camera.updateProjectionMatrix();
+      controls.target.copy(center);
+      controls.update();
+      return { box, size, center };
+    }
+
+    const FACE_COLOR       = 0x5b8def; // matches the --accent CSS color
+    const FACE_HOVER_COLOR = 0xffaa00;
+    const EDGE_COLOR       = 0xffaa00;
+    const EDGE_HOVER_COLOR = 0xff3333;
+    const BC_COLOR         = 0xb266ff; // purple -- entities with a constraint
+    const LOAD_FACE_COLOR  = 0xffd633; // yellow -- entities with a load
+    const PRESSURE_COLOR   = 0xffa500; // marker only, pressure loads specifically
+    function cssColor(hex) { return '#' + hex.toString(16).padStart(6, '0'); }
+
+    const hoverTargets = [];  // every face Mesh + edge LineSegments, for raycasting
+    const modelObjects = [];  // everything added to scene3d from scene.json -- torn down on every reload
+    const tooltip = document.getElementById('tooltip');
+    let hovered = null;
+
+    // ================================================================
+    // Axis gizmo -- a small fixed-size XYZ triad rendered in its own
+    // tiny viewport in a screen corner, mirroring the main camera's
+    // ROTATION only (not its zoom/pan/target) -- like the corner
+    // navigation cube in most CAD tools. Unlike the old model-centered
+    // AxesHelper, this stays a constant on-screen size and position
+    // regardless of model size or camera distance.
+    // One shared gizmo scene/camera is reused for every placement (one
+    // in the corner of the Setup view, one per quadrant in
+    // Results/Stress) -- only its viewport/scissor rect changes.
+    // ================================================================
+    const gizmoScene = new THREE.Scene();
+    gizmoScene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const GIZMO_AXIS_LENGTH = 1.4;
+    gizmoScene.add(new THREE.AxesHelper(GIZMO_AXIS_LENGTH));
+
+    const gizmoCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 10);
+    const GIZMO_DISTANCE = 4;
+    // Decoupled on purpose -- Setup has just the one gizmo in a
+    // corner, while Results/Stress only show a single one too (at the
+    // crosshair) so it can afford to be a bit bigger without crowding.
+    const GIZMO_SIZE_SETUP  = 90;  // px, Setup view's corner gizmo
+    const GIZMO_SIZE_RESULT = 110; // px, Results/Stress crosshair gizmo
+    const GIZMO_MARGIN = 14; // px, gap from the Setup view's screen edge
+
+    // Renders the gizmo into a size x size viewport whose bottom-left
+    // corner is at (x, y) in WebGL viewport coordinates (y grows UP
+    // from the bottom, unlike CSS) -- caller is responsible for
+    // enabling/disabling scissorTest around this. Only the depth
+    // buffer is cleared (autoClearColor off), so the gizmo draws
+    // directly on top of whatever was already rendered there (the
+    // main scene/quadrant) instead of painting a flat dark square
+    // behind it.
+    function renderGizmo(x, y, size) {
+      gizmoCamera.position.copy(camera.position)
+        .sub(controls.target).normalize().multiplyScalar(GIZMO_DISTANCE);
+      gizmoCamera.up.copy(camera.up);
+      gizmoCamera.lookAt(0, 0, 0);
+
+      renderer.setViewport(x, y, size, size);
+      renderer.setScissor(x, y, size, size);
+      renderer.autoClearColor = false;
+      renderer.clearDepth();
+      renderer.render(gizmoScene, gizmoCamera);
+      renderer.autoClearColor = true;
+    }
+
+    // X/Y/Z text labels for a gizmo -- one set is created per gizmo
+    // placement (Setup's single one, plus one per Results/Stress
+    // quadrant) since each needs its own div positions.
+    const GIZMO_AXIS_DIRS = {
+      X: new THREE.Vector3(GIZMO_AXIS_LENGTH, 0, 0),
+      Y: new THREE.Vector3(0, GIZMO_AXIS_LENGTH, 0),
+      Z: new THREE.Vector3(0, 0, GIZMO_AXIS_LENGTH),
+    };
+    function createGizmoLabelSet() {
+      const set = {};
+      for (const [name, color] of [['X', '#ff4444'], ['Y', '#44ff44'], ['Z', '#5599ff']]) {
+        const div = document.createElement('div');
+        div.className = 'axis-label';
+        div.style.fontSize = '11px';
+        div.textContent = name;
+        div.style.color = color;
+        div.style.display = 'none';
+        viewportArea.appendChild(div);
+        set[name] = div;
+      }
+      return set;
+    }
+
+    // Projects one gizmo's X/Y/Z labels onto its own small viewport,
+    // whose WebGL-coordinate origin is (x, y) (same meaning as in
+    // renderGizmo). All gizmos share the same orientation within a
+    // single frame (they all mirror the one main `camera`), so this
+    // can be called once per placement using the gizmoCamera state
+    // left behind by the renderGizmo() call for that same placement.
+    function updateGizmoLabelSet(labelSet, x, y, size) {
+      const cssLeft = x;
+      const cssTop  = viewportArea.clientHeight - y - size;
+      for (const name in GIZMO_AXIS_DIRS) {
+        const p = GIZMO_AXIS_DIRS[name].clone().project(gizmoCamera);
+        labelSet[name].style.left = (cssLeft + (p.x * 0.5 + 0.5) * size) + 'px';
+        labelSet[name].style.top  = (cssTop  + (-p.y * 0.5 + 0.5) * size) + 'px';
+        labelSet[name].style.display = (p.z > 1) ? 'none' : 'block';
+      }
+    }
+
+    const setupGizmoLabels = createGizmoLabelSet();
+    const quadrantGizmoLabels = createGizmoLabelSet(); // single gizmo, centered on the crosshair
+
+    // ================================================================
+    // RESULTS MODE: deformed shape, colored by Ux/Uy/Uz/total, shown
+    // as 4 viewports of the SAME canvas (one shared camera, so they
+    // all rotate together) -- built once when scene.json loads.
+    // ================================================================
+    let resultsReady = false;
+    const resultsMeshes = []; // { mesh, wire, name, min, max }
+
+    // Discretized "jet"-style colormap (9 bands, hard edges instead of a
+    // smooth blend) -- low to high: blue, cyan, light cyan, 3 greens,
+    // yellow, orange, red.
+    const COLOR_BANDS = [
+      0x0000ff, // blu
+      0x0099ff, // azzurro
+      0x66e5ff, // azzurro chiaro
+      0x00cc66, // verde scuro
+      0x00e600, // verde
+      0x99ff00, // verde chiaro
+      0xffff00, // giallo
+      0xff9900, // arancione
+      0xff0000, // rosso
+    ];
+
+    function bandColor01(idx) {
+      const hex = COLOR_BANDS[idx];
+      return [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+    }
+
+    function bandedColor(t) {
+      t = Math.max(0, Math.min(1, t));
+      const idx = Math.min(COLOR_BANDS.length - 1, Math.floor(t * COLOR_BANDS.length));
+      return bandColor01(idx);
+    }
+
+    // Same hard-edged bands, as a CSS gradient, for the legend bar.
+    function bandedGradientCSS() {
+      const n = COLOR_BANDS.length;
+      const stops = [];
+      for (let i = 0; i < n; i++) {
+        const c = '#' + COLOR_BANDS[i].toString(16).padStart(6, '0');
+        stops.push(`${c} ${(i / n * 100).toFixed(2)}%`, `${c} ${((i + 1) / n * 100).toFixed(2)}%`);
+      }
+      return `linear-gradient(to right, ${stops.join(', ')})`;
+    }
+
+    function buildColorAttribute(values) {
+      let min = Math.min(...values), max = Math.max(...values);
+      if (max - min < 1e-12) { min -= 1; max += 1; }
+      const colors = new Float32Array(values.length * 3);
+      for (let i = 0; i < values.length; i++) {
+        const [r, g, b] = bandedColor((values[i] - min) / (max - min));
+        colors[i*3] = r; colors[i*3+1] = g; colors[i*3+2] = b;
+      }
+      return { colors, min, max };
+    }
+
+    // Deformed node positions, shared by both Results and Stress pages
+    // -- they show the SAME exaggerated deformed shape, just colored by
+    // different fields, so this is only computed once.
+    function computeDeformedPositions(data, modelSize) {
+      const disp = data.displacements;
+      const n = data.nodes.length;
+      if (!disp || disp.length !== n) return null;
+
+      const ux = new Float64Array(n), uy = new Float64Array(n),
+            uz = new Float64Array(n), mag = new Float64Array(n);
+      let maxMag = 0;
+      for (let i = 0; i < n; i++) {
+        ux[i] = disp[i][0]; uy[i] = disp[i][1]; uz[i] = disp[i][2];
+        mag[i] = Math.sqrt(ux[i]*ux[i] + uy[i]*uy[i] + uz[i]*uz[i]);
+        if (mag[i] > maxMag) maxMag = mag[i];
+      }
+
+      // Exaggerate the deformation so the field is actually visible --
+      // scale it so the largest displacement becomes ~15% of the
+      // model's own size, instead of plotting it at real (tiny) scale.
+      const scale = maxMag > 0 ? (0.15 * modelSize) / maxMag : 1;
+
+      const positions = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        positions[i*3]   = data.nodes[i][0] + scale * ux[i];
+        positions[i*3+1] = data.nodes[i][1] + scale * uy[i];
+        positions[i*3+2] = data.nodes[i][2] + scale * uz[i];
+      }
+      return { positions, ux, uy, uz, mag };
+    }
+
+    // Builds one colored+wireframed mesh for a single field (e.g. Ux,
+    // or Sigma X) on top of the given (already deformed) positions, and
+    // fills its legend div -- shared by Results and Stress pages, the
+    // only difference between them is which field values/scene/unit
+    // they pass in.
+    function buildFieldMesh(targetScene, positions, mergedTriangles, name, values, legendDivId, unitLabel) {
+      const { colors, min, max } = buildColorAttribute(values);
+
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geom.setIndex(mergedTriangles);
+      geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geom.computeVertexNormals();
+
+      const mesh = new THREE.Mesh(
+        geom,
+        new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide })
+      );
+      mesh.visible = false;
+      targetScene.add(mesh);
+
+      // Overlay the triangle edges on the deformed shape too, same as
+      // in setup mode -- without it the colored field looks like a
+      // flat-shaded blob and you lose any sense of mesh density.
+      const wire = new THREE.LineSegments(
+        new THREE.WireframeGeometry(geom),
+        new THREE.LineBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.35 })
+      );
+      wire.visible = false;
+      targetScene.add(wire);
+
+      const legendDiv = document.getElementById(legendDivId);
+      legendDiv.innerHTML =
+        `<div><b>${name}</b> ${unitLabel}</div>` +
+        `<div class="grad-bar" style="background:${bandedGradientCSS()}"></div>` +
+        `<div class="minmax"><span>${min.toFixed(4)}</span><span>${max.toFixed(4)}</span></div>`;
+
+      return { mesh, wire, name, min, max };
+    }
+
+    function buildResultsScene(data, mergedTriangles, deformed) {
+      const fields = [
+        { name: 'Ux',    values: deformed.ux,  div: 'legendUx'  },
+        { name: 'Uy',    values: deformed.uy,  div: 'legendUy'  },
+        { name: 'Uz',    values: deformed.uz,  div: 'legendUz'  },
+        { name: 'Total', values: deformed.mag, div: 'legendMag' },
+      ];
+      for (const f of fields)
+        resultsMeshes.push(buildFieldMesh(
+          resultsScene, deformed.positions, mergedTriangles, f.name, f.values, f.div, '[mm]'));
+
+      frameCamera(resultsMeshes[0].mesh);
+      resultsReady = true;
+    }
+
+    // ================================================================
+    // STRESS MODE: same deformed shape as Results, colored by
+    // Sigma X/Y/Z and von Mises instead of displacement -- the safety
+    // factor (yield / true unaveraged peak von Mises) is shown as text
+    // next to the von Mises legend, since a single number like that
+    // doesn't belong on a per-vertex color scale.
+    // ================================================================
+    let stressReady = false;
+    const stressMeshes = [];
+
+    function buildStressScene(data, mergedTriangles, deformedPositions) {
+      const stress = data.stress;
+      const n = data.nodes.length;
+      if (!stress || !stress.sigma || stress.sigma.length !== n ||
+          !stress.vonMises || stress.vonMises.length !== n) {
+        return;
+      }
+
+      const sx = new Float64Array(n), sy = new Float64Array(n), sz = new Float64Array(n);
+      for (let i = 0; i < n; i++) {
+        sx[i] = stress.sigma[i][0];
+        sy[i] = stress.sigma[i][1];
+        sz[i] = stress.sigma[i][2];
+      }
+      const vm = Float64Array.from(stress.vonMises);
+
+      const fields = [
+        { name: 'σx',   values: sx, div: 'legendSx' },
+        { name: 'σy',   values: sy, div: 'legendSy' },
+        { name: 'σz',   values: sz, div: 'legendSz' },
+        { name: 'Von Mises', values: vm, div: 'legendVm' },
+      ];
+      for (const f of fields)
+        stressMeshes.push(buildFieldMesh(
+          stressScene, deformedPositions, mergedTriangles, f.name, f.values, f.div, '[MPa]'));
+
+      // The true peak (unaveraged across elements) and the resulting
+      // safety factor -- the contour above is nodally averaged, which
+      // would understate a sharp stress concentration, so this number
+      // is computed separately and is always the more conservative one.
+      const vmDiv = document.getElementById('legendVm');
+      if (stress.yieldStrength > 0) {
+        vmDiv.innerHTML +=
+          `<div>Peak (unaveraged): ${stress.maxVonMisesRaw.toFixed(1)} MPa</div>` +
+          `<div>Safety factor: ${stress.safetyFactor.toFixed(2)}</div>`;
+      } else {
+        vmDiv.innerHTML += `<div>Peak (unaveraged): ${stress.maxVonMisesRaw.toFixed(1)} MPa</div>`;
+      }
+
+      frameCamera(stressMeshes[0].mesh);
+      stressReady = true;
+    }
+
+    // Renders one quadrant per mesh in `meshes`, all from the same
+    // scene/camera -- used for both the Results and Stress pages.
+    // A single small axis gizmo is drawn centered exactly on the
+    // crosshair where all 4 quadrants meet, on top of whatever was
+    // rendered underneath it.
+    function renderQuadrants(meshes, targetScene) {
+      const w = viewportArea.clientWidth / 2;
+      const h = viewportArea.clientHeight / 2;
+      const origins = [
+        { x: 0, y: h }, // top-left
+        { x: w, y: h }, // top-right
+        { x: 0, y: 0 }, // bottom-left
+        { x: w, y: 0 }, // bottom-right
+      ];
+
+      renderer.setScissorTest(true);
+      for (let i = 0; i < meshes.length; i++) {
+        meshes.forEach((rm, j) => {
+          rm.mesh.visible = (j === i);
+          rm.wire.visible = (j === i);
+        });
+        const o = origins[i];
+        renderer.setViewport(o.x, o.y, w, h);
+        renderer.setScissor(o.x, o.y, w, h);
+        renderer.render(targetScene, camera);
+      }
+
+      const gx = w - GIZMO_SIZE_RESULT / 2;
+      const gy = h - GIZMO_SIZE_RESULT / 2;
+      renderGizmo(gx, gy, GIZMO_SIZE_RESULT);
+      updateGizmoLabelSet(quadrantGizmoLabels, gx, gy, GIZMO_SIZE_RESULT);
+      renderer.setScissorTest(false);
+    }
+
+    // ================================================================
+    // Mode switching
+    // ================================================================
+    let mode = 'setup';
+    const btnSetup = document.getElementById('btnSetup');
+    const btnResults = document.getElementById('btnResults');
+    const btnStress = document.getElementById('btnStress');
+    const setupOnlyIds   = ['tooltip', 'legend', 'info'];
+    const resultsLegendIds = ['legendUx', 'legendUy', 'legendUz', 'legendMag'];
+    const stressLegendIds  = ['legendSx', 'legendSy', 'legendSz', 'legendVm'];
+    const quadDividerIds   = ['quadDividerV', 'quadDividerH'];
+
+    function setMode(newMode) {
+      mode = newMode;
+      btnSetup.classList.toggle('active', mode === 'setup');
+      btnResults.classList.toggle('active', mode === 'results');
+      btnStress.classList.toggle('active', mode === 'stress');
+
+      for (const id of setupOnlyIds)
+        document.getElementById(id).style.display = (mode === 'setup') ? '' : 'none';
+      for (const id of resultsLegendIds)
+        document.getElementById(id).style.display = (mode === 'results') ? 'block' : 'none';
+      for (const id of stressLegendIds)
+        document.getElementById(id).style.display = (mode === 'stress') ? 'block' : 'none';
+      for (const id of quadDividerIds)
+        document.getElementById(id).style.display =
+          (mode === 'results' || mode === 'stress') ? 'block' : 'none';
+      // Force-hide labels for whichever gizmo set isn't being updated
+      // every frame in this mode -- the active set's own per-frame
+      // z-check (in updateGizmoLabelSet) takes it from there.
+      if (mode !== 'setup')
+        for (const name in setupGizmoLabels) setupGizmoLabels[name].style.display = 'none';
+      if (mode === 'setup')
+        for (const name in quadrantGizmoLabels) quadrantGizmoLabels[name].style.display = 'none';
+
+      document.getElementById('resultsMessage').style.display =
+        ((mode === 'results' && !resultsReady) || (mode === 'stress' && !stressReady))
+          ? 'block' : 'none';
+
+      if (mode === 'setup') frameCamera(scene3d);
+      else if (mode === 'results' && resultsReady) frameCamera(resultsMeshes[0].mesh);
+      else if (mode === 'stress' && stressReady) frameCamera(stressMeshes[0].mesh);
+    }
+    btnSetup.addEventListener('click', () => setMode('setup'));
+    btnResults.addEventListener('click', () => setMode('results'));
+    btnStress.addEventListener('click', () => setMode('stress'));
+
+    // ================================================================
+    // Loading scene.json -- polled periodically (no manual 'web' +
+    // browser refresh needed: every model-changing CLI command now
+    // re-exports scene.json on its own, see autoExportWeb() in
+    // InteractiveCLI.cpp) and fully torn down + rebuilt on every
+    // change, so a second 'mesh' run (or any other update) replaces
+    // the old scene instead of piling objects on top of it.
+    // ================================================================
+    function disposeOne(obj) {
+      obj.geometry?.dispose();
+      obj.material?.dispose();
+    }
+
+    function clearFieldMeshes(meshArray, targetScene) {
+      for (const rm of meshArray) {
+        targetScene.remove(rm.mesh, rm.wire);
+        disposeOne(rm.mesh);
+        disposeOne(rm.wire);
+      }
+      meshArray.length = 0;
+    }
+
+    function clearScene() {
+      for (const obj of modelObjects) {
+        scene3d.remove(obj);
+        disposeOne(obj);
+      }
+      modelObjects.length = 0;
+      hoverTargets.length = 0;
+      hovered = null;
+      tooltip.style.display = 'none';
+
+      clearFieldMeshes(resultsMeshes, resultsScene);
+      clearFieldMeshes(stressMeshes, stressScene);
+      resultsReady = false;
+      stressReady = false;
+
+      document.getElementById('legend').innerHTML = '';
+      document.getElementById('resultsMessage').style.display =
+        (mode !== 'setup') ? 'block' : 'none';
+    }
+
+    function applySceneData(data) {
+        clearScene();
+        const positions = new Float32Array(data.nodes.flat());
+
+        // Which entities have a constraint/load, so their face/edge
+        // itself can be tinted -- not just the small marker square --
+        // purple for "has a constraint", yellow for "has a load"
+        // (checked in that order: an entity with both shows as
+        // constrained, since that's the structurally defining one).
+        const bcKeys = new Set(data.bcs.map(bc => `${bc.dim},${bc.tag}`));
+        const loadKeys = new Set(data.loads.map(ld => `${ld.dim},${ld.tag}`));
+
+        const mergedTriangles = [];
+
+        for (const ent of data.entities) {
+          const label = `${ent.name} (dim ${ent.dim}, tag ${ent.tag})`;
+          const key = `${ent.dim},${ent.tag}`;
+          const baseColor = bcKeys.has(key)   ? BC_COLOR :
+                             loadKeys.has(key) ? LOAD_FACE_COLOR :
+                                                  null; // null = use the type's own default below
+
+          if (ent.triangles.length > 0) {
+            mergedTriangles.push(...ent.triangles.flat());
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setIndex(ent.triangles.flat());
+            geometry.computeVertexNormals();
+
+            const faceColor = baseColor ?? FACE_COLOR;
+            const mesh = new THREE.Mesh(
+              geometry,
+              new THREE.MeshStandardMaterial({ color: faceColor, side: THREE.DoubleSide })
+            );
+            mesh.userData.label = label;
+            mesh.userData.baseColor = faceColor;
+            mesh.userData.hoverColor = FACE_HOVER_COLOR;
+            scene3d.add(mesh);
+            hoverTargets.push(mesh);
+            modelObjects.push(mesh);
+
+            // Overlay the triangle edges so the actual mesh density is
+            // visible, not just a smooth shaded solid.
+            const wire = new THREE.LineSegments(
+              new THREE.WireframeGeometry(geometry),
+              new THREE.LineBasicMaterial({ color: 0x111111 })
+            );
+            scene3d.add(wire);
+            modelObjects.push(wire);
+          }
+
+          if (ent.lines.length > 0) {
+            const linePositions = [];
+            for (const [a, b] of ent.lines) {
+              linePositions.push(...data.nodes[a], ...data.nodes[b]);
+            }
+            const lineGeom = new THREE.BufferGeometry();
+            lineGeom.setAttribute(
+              'position', new THREE.BufferAttribute(new Float32Array(linePositions), 3)
+            );
+            const edgeColor = baseColor ?? EDGE_COLOR;
+            const lineMesh = new THREE.LineSegments(
+              lineGeom, new THREE.LineBasicMaterial({ color: edgeColor })
+            );
+            lineMesh.userData.label = label;
+            lineMesh.userData.baseColor = edgeColor;
+            lineMesh.userData.hoverColor = EDGE_HOVER_COLOR;
+            scene3d.add(lineMesh);
+            hoverTargets.push(lineMesh);
+            modelObjects.push(lineMesh);
+          }
+        }
+
+        if (hoverTargets.length === 0) return;
+
+        const { size: modelSize } = frameCamera(scene3d);
+
+        // Lines are infinitely thin geometrically -- without a
+        // threshold the ray would have to hit them pixel-perfect.
+        // Scale it to the model so edges are easy to hover on any
+        // part size (mm or m).
+        raycaster.params.Line.threshold = modelSize * 0.004;
+
+        // Note: the coordinate axes themselves are the small corner
+        // gizmo (see "Axis gizmo" above), not anchored to the model --
+        // red=X, green=Y, blue=Z, same convention/orientation used for
+        // Fx/Fy/Fz when defining loads, and reused below for the
+        // load markers' colors.
+        const AXIS_COLORS = ['#ff4444', '#44ff44', '#5599ff']; // X, Y, Z
+        const markerSize = modelSize * 0.025;
+
+        function addMarker(colorHex, pos) {
+          const sprite = new THREE.Sprite(
+            new THREE.SpriteMaterial({ color: colorHex, depthTest: false })
+          );
+          sprite.scale.set(markerSize, markerSize, 1);
+          sprite.position.set(pos.x, pos.y, pos.z);
+          scene3d.add(sprite);
+          modelObjects.push(sprite);
+        }
+
+        let legendHTML = '';
+
+        if (data.bcs.length > 0) {
+          legendHTML += '<b><i data-lucide="lock"></i>Constraints</b>';
+          data.bcs.forEach((bc, i) => {
+            addMarker(BC_COLOR, bc);
+            legendHTML += `<div class="row">`
+              + `<span class="swatch" style="background:${cssColor(BC_COLOR)}"></span>`
+              + `Constraint ${i + 1}: ${bc.type}</div>`;
+          });
+        }
+
+        if (data.loads.length > 0) {
+          legendHTML += '<b><i data-lucide="zap"></i>Loads</b>';
+          let forceCount = 0, pressureCount = 0;
+          for (const ld of data.loads) {
+            if (ld.type === 'force') {
+              forceCount++;
+              const absVals = ld.values.map(Math.abs);
+              const axis = absVals.indexOf(Math.max(...absVals));
+              const color = AXIS_COLORS[axis]; // marker still colored by the dominant axis
+
+              // Text shows every nonzero component -- the marker color
+              // alone only hints at the dominant one, it would hide
+              // the others for a genuinely 3-axis force like (Fx,Fy,Fz)
+              // all nonzero.
+              const parts = ['X', 'Y', 'Z']
+                .map((name, i) => [name, ld.values[i]])
+                .filter(([, v]) => v !== 0)
+                .map(([name, v]) => `F${name.toLowerCase()}=${v >= 0 ? '+' : ''}${v}`);
+
+              addMarker(color, ld);
+              legendHTML += `<div class="row">`
+                + `<span class="swatch" style="background:${color}"></span>`
+                + `Force ${forceCount}: ${parts.join(', ')} N</div>`;
+            } else if (ld.type === 'pressure') {
+              pressureCount++;
+              addMarker(PRESSURE_COLOR, ld);
+              legendHTML += `<div class="row">`
+                + `<span class="swatch" style="background:${cssColor(PRESSURE_COLOR)}"></span>`
+                + `Pressure ${pressureCount}: ${ld.values[0]} MPa</div>`;
+            }
+          }
+        }
+
+        document.getElementById('legend').innerHTML =
+          legendHTML || '(no constraint/load defined)';
+        lucide.createIcons(); // re-scan for the <i data-lucide> just inserted above
+
+        const deformed = computeDeformedPositions(data, modelSize);
+        if (deformed) {
+          buildResultsScene(data, mergedTriangles, deformed);
+          buildStressScene(data, mergedTriangles, deformed.positions);
+        } else {
+          document.getElementById('resultsMessage').style.display = 'block';
+        }
+    }
+
+    // Cache-bust: scene.json gets regenerated by autoExportWeb(), but
+    // browsers tend to cache plain fetch() responses -- without this
+    // the page could keep re-fetching the same stale bytes.
+    function loadScene() {
+      return fetch('scene.json?t=' + Date.now())
+        .then(r => r.json())
+        .then(data => applySceneData(data))
+        .catch(() => clearScene());
+    }
+
+    // Polls for changes instead of requiring a manual browser refresh
+    // -- HEAD + Last-Modified is enough to detect a new export without
+    // re-downloading/rebuilding the whole scene every tick.
+    let lastSceneModified = null;
+    function pollScene() {
+      fetch('scene.json', { method: 'HEAD', cache: 'no-store' })
+        .then(head => {
+          if (!head.ok) {
+            if (lastSceneModified !== null) { lastSceneModified = null; clearScene(); }
+            return;
+          }
+          const lm = head.headers.get('Last-Modified');
+          if (lm !== lastSceneModified) {
+            lastSceneModified = lm;
+            loadScene();
+          }
+        })
+        .catch(() => { /* transient network hiccup -- try again next tick */ });
+    }
+    pollScene();
+    setInterval(pollScene, 1200);
+
+    // Hover detection: cast a ray from the camera through the mouse
+    // position, see which face/edge it hits, recolor it and show its
+    // name in the tooltip -- this is what lets you point straight at
+    // e.g. "the big outer face" instead of hunting through a list of
+    // ~170 entities by name.
+    const raycaster = new THREE.Raycaster();
+    const mouseNDC = new THREE.Vector2();
+
+    window.addEventListener('pointermove', (event) => {
+      if (mode !== 'setup') return;
+      mouseNDC.x = (event.clientX / viewportArea.clientWidth) * 2 - 1;
+      mouseNDC.y = -(event.clientY / viewportArea.clientHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouseNDC, camera);
+      const hit = raycaster.intersectObjects(hoverTargets)[0];
+
+      if (hovered && hovered !== hit?.object) {
+        hovered.material.color.setHex(hovered.userData.baseColor);
+        hovered = null;
+      }
+
+      if (hit) {
+        hovered = hit.object;
+        hovered.material.color.setHex(hovered.userData.hoverColor);
+        tooltip.textContent = hovered.userData.label;
+        tooltip.style.left = event.clientX + 'px';
+        tooltip.style.top  = event.clientY + 'px';
+        tooltip.style.display = 'block';
+      } else {
+        tooltip.style.display = 'none';
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = viewportArea.clientWidth / viewportArea.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(viewportArea.clientWidth, viewportArea.clientHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+
+      if (mode === 'setup') {
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, viewportArea.clientWidth, viewportArea.clientHeight);
+        renderer.render(scene3d, camera);
+
+        const gx = viewportArea.clientWidth  - GIZMO_MARGIN - GIZMO_SIZE_SETUP;
+        const gy = GIZMO_MARGIN;
+        renderer.setScissorTest(true);
+        renderGizmo(gx, gy, GIZMO_SIZE_SETUP);
+        renderer.setScissorTest(false);
+        updateGizmoLabelSet(setupGizmoLabels, gx, gy, GIZMO_SIZE_SETUP);
+      } else if (mode === 'results' && resultsReady) {
+        renderQuadrants(resultsMeshes, resultsScene);
+      } else if (mode === 'stress' && stressReady) {
+        renderQuadrants(stressMeshes, stressScene);
+      }
+    }
+    animate();
+  </script>
+</body>
+</html>
