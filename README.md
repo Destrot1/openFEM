@@ -78,8 +78,6 @@ See **[docs/commands.md](docs/commands.md)** for the full command reference
   type, for running the container and for driving the CLI.
 - **[docs/architecture.md](docs/architecture.md)** — how the project is
   organized: folder layout and what each part is responsible for.
-- **[docs/methodology.md](docs/methodology.md)** — the engineering methods
-  used (element formulations, unit system, load distribution, solver).
 
 ## Tech stack
 
