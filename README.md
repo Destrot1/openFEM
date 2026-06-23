@@ -3,10 +3,9 @@
 </p>
 
 <p align="center">
-  A browser-based Finite Element Analysis tool for mechanical parts.<br>
+  A browser-based Finite Element tool for Structural Analysis of mechanical parts.<br>
   Load a STEP file, mesh it, apply constraints and loads, solve, and see the
-  deformed shape and stress directly in your browser — no desktop CAD/FEA
-  software, no manual setup.
+  deformed shape and stress directly in your browser.
 </p>
 
 ---
@@ -21,12 +20,15 @@ Everything runs inside a single Docker container, driven from one browser tab
 that shows both the 3D viewer and a real terminal — no separate windows, no
 host-side toolchain to install.
 
-- **CAD import** — reads STEP files via OpenCASCADE, no manual cleanup needed.
+- **CAD import** — reads STEP files via OpenCASCADE and converts them to
+  BREP before meshing, a lossless format with no topology-reconstruction
+  ambiguity (unlike re-parsing STEP directly).
 - **Meshing** — tetrahedral meshing via gmsh, with automatic mesh-size
   fallback if a requested size is too heavy to compute in time.
 - **Constraints & loads** — fixed/pinned/custom (per-DOF) boundary
   conditions, point forces and pressure loads, distributed by tributary
-  area/length rather than split evenly per node.
+  area/length rather than split evenly per node — so the result reflects
+  the real load distribution instead of an artifact of mesh density.
 - **Solver** — direct sparse solve (Eigen), with a live progress readout for
   large systems.
 - **Results** — deformed shape (Ux/Uy/Uz/Total) and stress (σx/σy/σz/Von
@@ -38,8 +40,8 @@ host-side toolchain to install.
 
 ## Screenshots
 
-**Setup** — hover any face/edge to see its name, with constraints/loads
-marked directly on the geometry.
+**Setup** — import the body, mesh it, and apply constraints and loads
+directly on the geometry.
 
 ![Setup view](docs/images/setup_window.png)
 
@@ -50,7 +52,7 @@ marked directly on the geometry.
 **Stress** — σx/σy/σz/Von Mises, with the peak (unaveraged) stress and
 safety factor shown next to the Von Mises panel.
 
-![Stress view](docs/images/stree_results_window.png)
+![Stress view](docs/images/stress_results_window.png)
 
 ## Quickstart
 
@@ -76,6 +78,8 @@ See **[docs/commands.md](docs/commands.md)** for the full command reference
   type, for running the container and for driving the CLI.
 - **[docs/architecture.md](docs/architecture.md)** — how the project is
   organized: folder layout and what each part is responsible for.
+- **[docs/methodology.md](docs/methodology.md)** — the engineering methods
+  used (element formulations, unit system, load distribution, solver).
 
 ## Tech stack
 
