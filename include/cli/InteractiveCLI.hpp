@@ -28,8 +28,7 @@ private:
 
     // Re-exports scene.json after any command that changes the model,
     // so the browser viewer (which polls for changes) picks it up on
-    // its own -- there's no user-facing 'web' command anymore. Silent
-    // no-op if there's no geometry yet.
+    // its own
     void autoExportWeb();
 
     void        printBanner();

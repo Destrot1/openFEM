@@ -4,9 +4,8 @@
 #include <STEPControl_Reader.hxx>
 #include <BRepTools.hxx>
 
-// TODO: g_shape is a file-scope global -- the importer is effectively a
-// singleton and cannot hold more than one geometry at a time. Move the
-// TopoDS_Shape into the StepImporter instance (pimpl) to make it reentrant.
+// g_shape is a file-scope global -- the importer is effectively a
+// singleton and cannot hold more than one geometry at a time
 static TopoDS_Shape g_shape;
 
 bool StepImporter::load(const std::string& filepath) {

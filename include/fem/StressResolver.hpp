@@ -17,11 +17,8 @@ struct ElementStress {
 };
 
 struct NodalStressResult {
-    // One entry per mesh node, averaged over every element touching
-    // it -- gives a smooth contour for display. Averaging hides the
-    // real peak at a sharp stress concentration (e.g. a hole's edge),
-    // which is why maxVonMisesRaw/safetyFactor below come from the
-    // unaveraged per-element values instead.
+    // Nodally-averaged stress for a smooth contour, plus the TRUE unaveraged
+    // peak (and resulting safety factor) -- averaging would hide a sharp peak.
     std::vector<std::array<double,3>> nodalSigmaNormal; // sxx, syy, szz
     std::vector<double>               nodalVonMises;
 

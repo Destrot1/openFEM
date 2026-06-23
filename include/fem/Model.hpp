@@ -4,23 +4,13 @@
 #include <array>
 #include "mesh/Mesh.hpp"
 
-// Unit system used EVERYWHERE in this project: mm, N, MPa, tonne.
-// Why: STEP files from mechanical CAD are almost always authored in
-// millimeters, and we never convert the geometry (StepImporter/Mesher
-// read node coordinates exactly as the file has them) -- so every other
-// quantity (material stiffness, section properties, mesh size) has to
-// be expressed in a unit system that's consistent with millimeters,
-// not meters. MPa = N/mm^2 makes this work out exactly: 1 MPa = 1e6 Pa,
-// matching the mm/m^3 scale difference. This is the same convention
-// many CAD-driven FEM tools (Abaqus, Ansys, etc.) default to for this
-// exact reason.
-// NOTE: a STEP file authored in a different unit (inches, meters...)
-// is NOT auto-detected or converted -- this project assumes mm.
+// Unit system used everywhere: mm, N, MPa, tonne -- matches STEP files
+// (authored in mm), since geometry is never converted to meters.
 struct Material {
     int         id;
     std::string name;
     double      E             = 210e3;   // MPa (210 GPa)
-    double      nu            = 0.3;
+    double      nu            = 0.3;     // Poisson coeff. 
     double      rho           = 7.85e-9; // tonne/mm^3
     double      yieldStrength = 0;       // MPa, 0 = not set (safety factor not computable)
 };
@@ -34,9 +24,8 @@ struct BeamSection {
     double      J    = 0; // mm^4
 };
 
-// entityId is a gmsh tag, unique only within its own dimension -- so
-// dim is required alongside it to identify an entity unambiguously
-// (e.g. (dim=2, entityId=5) and (dim=3, entityId=5) are different entities).
+// entityId is a gmsh tag, unique only within its own dimension --
+// dim is needed too, to identify an entity without ambiguity.
 struct EntityAssignment {
     int         dim        = -1;
     int         entityId   = -1;
@@ -49,12 +38,8 @@ struct EntityAssignment {
 
 enum class BCType { FIXED, PINNED, CUSTOM };
 
-// locked[i] = true means that DOF is constrained to zero; false means
-// it's free. Order: ux, uy, uz, rotx, roty, rotz. FIXED/PINNED are just
-// convenient presets for this same mask (see cmdBoundary): FIXED locks
-// all 6, PINNED locks only the 3 translations. CUSTOM lets the user
-// pick each one individually -- no magnitude, only locked-or-free
-// (a nonzero prescribed displacement isn't supported, just lock/free).
+// locked[ux,uy,uz,rotx,roty,rotz] = true means that DOF is fixed to zero.
+// FIXED locks all 6, PINNED locks translations only, CUSTOM picks per-DOF.
 struct BoundaryCondition {
     int    dim      = -1;
     int    entityId = -1;
@@ -92,24 +77,17 @@ struct FEMModel {
 
     std::vector<double> displacements;
 
-    // One [ux,uy,uz] per node (mm), same order as mesh.nodes -- a
-    // convenience view of `displacements` (which is flat, indexed by
-    // global DOF) for anything that wants "this node moved by this
-    // much", like the results viewer. Filled by cmdSolve() right after
-    // solving; empty until then.
+    // Per-node [ux,uy,uz] in mm, same order as mesh.nodes -- filled by
+    // cmdSolve() after solving; empty until then.
     std::vector<std::array<double,3>> nodalDisplacements;
 
-    // Per-node stress (MPa), averaged over every element touching that
-    // node -- smooths the contour for display, same idea as
-    // nodalDisplacements above. Filled by cmdSolve(); empty until then.
+    // Per-node stress (MPa), averaged over touching elements for a smooth
+    // contour. Filled by cmdSolve(); empty until then.
     std::vector<std::array<double,3>> nodalStressNormal; // sxx, syy, szz
     std::vector<double>               nodalVonMises;
 
-    // The TRUE (unaveraged) peak von Mises stress across all elements,
-    // and the resulting safety factor against the yield strength of
-    // the material at that element -- the nodal average above is only
-    // for the contour plot; it would understate a sharp stress
-    // concentration (e.g. at a hole's edge).
+    // True unaveraged peak von Mises stress and the resulting safety factor --
+    // the nodal average above would hide a sharp local stress peak.
     double maxVonMisesRaw    = 0; // MPa
     double yieldStrengthUsed = 0; // yield strength of the material at the peak element, MPa
     double safetyFactor      = 0; // yieldStrengthUsed / maxVonMisesRaw, 0 if not computable
