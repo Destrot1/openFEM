@@ -3,6 +3,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
+    python3 \
     build-essential \
     cmake \
     git \
@@ -22,10 +23,6 @@ RUN apt-get update && apt-get install -y \
     libeigen3-dev \
     nlohmann-json3-dev \
     libfmt-dev \
-    xvfb \
-    x11vnc \
-    novnc \
-    websockify \
     ttyd \
     libgl1 \
     libxext6 \
@@ -36,14 +33,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace
 
-# Starts a virtual display + VNC + noVNC web bridge so GUI windows
-# opened inside the container (e.g. gmsh's viewer) can be seen from a
-# browser on the host at http://localhost:6080 -- works the same on
-# any host OS, no X server needed on the host.
 COPY docker/start-gui.sh /usr/local/bin/start-gui.sh
 RUN chmod +x /usr/local/bin/start-gui.sh
 
-ENV DISPLAY=:99
 
 ENTRYPOINT ["/usr/local/bin/start-gui.sh"]
 CMD ["/bin/bash"]
