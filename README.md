@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="openFEM" width="280">
+  <img src="docs/logo.svg" alt="openFEM" width="216">
 </p>
 
 <p align="center">
